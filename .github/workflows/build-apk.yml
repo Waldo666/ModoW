@@ -24,7 +24,8 @@ jobs:
           unzip -q ModoW-proyecto.zip -d extracted
           export JAVA_HOME="${JAVA_HOME_17_X64}"
           export PATH="$JAVA_HOME/bin:$PATH"
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
           curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
           unzip -q /tmp/gradle.zip -d /tmp
           /tmp/gradle-8.9/bin/gradle -p extracted/ModoW :app:assembleDebug --stacktrace
