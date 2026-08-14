@@ -21,19 +21,19 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          unzip -q ModoW-proyecto.zip -d extracted
           export JAVA_HOME="${JAVA_HOME_17_X64}"
           export PATH="$JAVA_HOME/bin:$PATH"
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
           curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          rm -rf /tmp/gradle-8.9
           unzip -q /tmp/gradle.zip -d /tmp
-          /tmp/gradle-8.9/bin/gradle -p extracted/ModoW :app:assembleDebug --stacktrace
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose extracted/ModoW/app/build/outputs/apk/debug/app-debug.apk
+          /tmp/gradle-8.9/bin/gradle :app:assembleDebug --stacktrace
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
 
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: ModoW-APK
-          path: extracted/ModoW/app/build/outputs/apk/debug/app-debug.apk
+          name: ModoW-APK-v1.1
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
