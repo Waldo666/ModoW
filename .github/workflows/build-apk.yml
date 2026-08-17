@@ -1,10 +1,10 @@
-name: Build Modo W APK
+name: Build W-mode APK
 
 "on":
   push:
     branches:
       - main
-      - agent/v1.2-weekly-notifications
+      - agent/v1.3-ui-polish
   workflow_dispatch:
 
 permissions:
@@ -35,6 +35,6 @@ jobs:
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: ModoW-APK-v1.2
+          name: W-mode-APK-v1.3
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
