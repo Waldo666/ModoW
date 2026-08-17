@@ -4,7 +4,6 @@ name: Build W-mode APK
   push:
     branches:
       - main
-      - agent/v1.3-ui-polish
   workflow_dispatch:
 
 permissions:
