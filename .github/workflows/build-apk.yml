@@ -18,7 +18,7 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Preparar y compilar APK
+      - name: Preparar y compilar APK release
         shell: bash
         run: |
           set -euxo pipefail
@@ -29,12 +29,17 @@ jobs:
           curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
           rm -rf /tmp/gradle-8.9
           unzip -q /tmp/gradle.zip -d /tmp
-          /tmp/gradle-8.9/bin/gradle :app:assembleDebug --stacktrace
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          /tmp/gradle-8.9/bin/gradle :app:assembleRelease --stacktrace
+          mkdir -p signing-tools/lib
+          cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" signing-tools/
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-tools/lib/
+          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" signing-tools/
 
-      - name: Publicar APK
+      - name: Publicar APK release y herramientas
         uses: actions/upload-artifact@v4
         with:
-          name: ModoW-APK-v1.2
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ModoW-v1.2-signing-kit
+          path: |
+            app/build/outputs/apk/release/app-release-unsigned.apk
+            signing-tools/
           if-no-files-found: error
