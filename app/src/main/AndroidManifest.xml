@@ -8,7 +8,7 @@
         android:allowBackup="true"
         android:fullBackupContent="true"
         android:icon="@drawable/app_icon_leoric"
-        android:label="Modo W"
+        android:label="W-mode"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 

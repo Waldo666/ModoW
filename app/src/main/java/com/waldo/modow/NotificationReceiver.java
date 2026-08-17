@@ -51,7 +51,7 @@ public class NotificationReceiver extends BroadcastReceiver {
 
         String channelId = "habit_" + h.id() + "_" + Integer.toHexString(String.valueOf(sound).hashCode());
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(channelId, "Modo W · " + h.name(), NotificationManager.IMPORTANCE_HIGH);
+            NotificationChannel channel = new NotificationChannel(channelId, "W-mode · " + h.name(), NotificationManager.IMPORTANCE_HIGH);
             AudioAttributes attrs = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -70,7 +70,7 @@ public class NotificationReceiver extends BroadcastReceiver {
                 ? new Notification.Builder(context, channelId)
                 : new Notification.Builder(context);
         b.setSmallIcon(R.drawable.notification_icon)
-                .setContentTitle("Modo W")
+                .setContentTitle("W-mode")
                 .setContentText("Es hora de: " + h.name())
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
