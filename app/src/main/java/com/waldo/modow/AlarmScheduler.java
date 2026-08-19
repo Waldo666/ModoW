@@ -6,11 +6,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.temporal.TemporalAdjusters;
 
 public final class AlarmScheduler {
     private AlarmScheduler() {}
@@ -29,16 +27,19 @@ public final class AlarmScheduler {
         if (!h.active() || !h.notifyEnabled()) return;
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDate targetDate;
-        if (h.weekly()) {
-            DayOfWeek wanted = DayOfWeek.of(Math.max(1, Math.min(7, h.weekday())));
-            targetDate = now.toLocalDate().with(TemporalAdjusters.nextOrSame(wanted));
-        } else {
-            targetDate = now.toLocalDate();
+        LocalDateTime target = null;
+
+        for (int offset = 0; offset <= 8; offset++) {
+            LocalDate candidateDay = now.toLocalDate().plusDays(offset);
+            if (!h.dueOn(candidateDay)) continue;
+            LocalDateTime candidate = candidateDay.atTime(h.notifyHour(), h.notifyMinute());
+            if (candidate.isAfter(now)) {
+                target = candidate;
+                break;
+            }
         }
 
-        LocalDateTime target = targetDate.atTime(h.notifyHour(), h.notifyMinute());
-        if (!target.isAfter(now)) target = h.weekly() ? target.plusWeeks(1) : target.plusDays(1);
+        if (target == null) return;
 
         long triggerAt = target.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
