@@ -4,7 +4,6 @@ name: Build W-mode APK
   push:
     branches:
       - main
-      - agent/v1.5-delete-check-chart
   workflow_dispatch:
 
 permissions:
