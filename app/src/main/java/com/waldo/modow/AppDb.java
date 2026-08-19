@@ -188,6 +188,19 @@ public final class AppDb extends SQLiteOpenHelper {
         getWritableDatabase().update("habits", v, "id=?", new String[]{String.valueOf(id)});
     }
 
+    public void deleteHabit(long id) {
+        SQLiteDatabase db=getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String[] args={String.valueOf(id)};
+            db.delete("completions","habit_id=?",args);
+            db.delete("habits","id=?",args);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     public void move(long id, int delta) {
         List<Habit> list = habits(true);
         int index = -1;
