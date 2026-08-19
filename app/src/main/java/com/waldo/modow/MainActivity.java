@@ -62,6 +62,8 @@ public class MainActivity extends Activity {
     private boolean tabTransitionRunning;
     private float touchDownX, touchDownY;
 
+    private record ChartData(float[] values, String[] labels, String subtitle) {}
+
     public static LocalDate operationalDay() {
         LocalDateTime now = LocalDateTime.now();
         return (now.getHour()==0 && now.getMinute()==0) ? now.toLocalDate().minusDays(1) : now.toLocalDate();
@@ -114,8 +116,19 @@ public class MainActivity extends Activity {
     private void buildShell() {
         root = column(BG); setContentView(root); root.post(this::hideSystemBarsCompat);
         LinearLayout head = row(BG); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(20),dp(26),dp(20),dp(8));
-        ImageView icon = new ImageView(this); icon.setImageResource(R.drawable.app_icon_leoric); icon.setScaleType(ImageView.ScaleType.CENTER_CROP); head.addView(icon,new LinearLayout.LayoutParams(dp(50),dp(50)));
-        LinearLayout titles = column(BG); titles.setPadding(dp(10),0,0,0); titles.addView(text("W-MODE",22,TEXT,true)); titles.addView(text("Tu sistema. Tus reglas.",12,MUTED,false)); head.addView(titles,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1)); root.addView(head);
+
+        LinearLayout titles = column(BG);
+        titles.addView(text("W-MODE",22,TEXT,true));
+        titles.addView(text("Tu sistema. Tus reglas.",12,MUTED,false));
+        head.addView(titles,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.app_icon_leoric);
+        icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(dp(50),dp(50));
+        iconLp.leftMargin=dp(12);
+        head.addView(icon,iconLp);
+        root.addView(head);
 
         screenScroll = new ScrollView(this);
         screenScroll.setClipToPadding(false);
@@ -200,6 +213,10 @@ public class MainActivity extends Activity {
         content.setScaleX(1); content.setScaleY(1); content.setAlpha(1);
     }
 
+    private void scrollTop() {
+        if(screenScroll!=null) screenScroll.post(()->screenScroll.scrollTo(0,0));
+    }
+
     private void setNav(String selected) {
         nav.removeAllViews();
         nav.addView(navButton("HOY", "today", selected), new LinearLayout.LayoutParams(0,-1,1));
@@ -215,9 +232,12 @@ public class MainActivity extends Activity {
     }
 
     private void renderToday(boolean animate,int direction) {
-        tab="today"; setNav(tab); resetContentTransform(); content.removeAllViews(); LocalDate day=operationalDay();
-        content.addView(text(day.format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM",new Locale("es","AR"))).toUpperCase(),13,ACCENT,true));
-        TextView h=text("Modo configuración",30,TEXT,true); h.setPadding(0,dp(4),0,dp(4)); content.addView(h);
+        tab="today"; setNav(tab); resetContentTransform(); content.removeAllViews(); scrollTop(); LocalDate day=operationalDay();
+
+        TextView date=centeredText(day.format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM",new Locale("es","AR"))).toUpperCase(),13,ACCENT,true);
+        content.addView(date,new LinearLayout.LayoutParams(-1,-2));
+        TextView h=centeredText("TUS HÁBITOS",30,TEXT,true); h.setPadding(0,dp(4),0,dp(8)); content.addView(h,new LinearLayout.LayoutParams(-1,-2));
+
         List<AppDb.Habit> due = db.habitsDueOn(day, true);
         int total=due.size(), done=0; for(AppDb.Habit habit:due) if(db.isDone(habit.id(),day)) done++;
         content.addView(progressCard(done,total)); space(content,14);
@@ -237,19 +257,25 @@ public class MainActivity extends Activity {
     }
 
     private View habitCard(AppDb.Habit h,LocalDate day){
-        boolean done=db.isDone(h.id(),day); LinearLayout c=card(); c.setOrientation(LinearLayout.HORIZONTAL); c.setGravity(Gravity.CENTER_VERTICAL); c.setPadding(dp(18),dp(14),dp(14),dp(14));
+        boolean done=db.isDone(h.id(),day);
+        LinearLayout c=card(); c.setOrientation(LinearLayout.HORIZONTAL); c.setGravity(Gravity.CENTER_VERTICAL); c.setPadding(dp(18),dp(14),dp(14),dp(14));
         LinearLayout info=column(Color.TRANSPARENT);
-        TextView name=text(h.name(),18,done?DONE:TEXT,true); if(done) name.setPaintFlags(name.getPaintFlags()|Paint.STRIKE_THRU_TEXT_FLAG); info.addView(name);
+        TextView name=text(h.name(),18,done?DONE:TEXT,true);
+        if(done) name.setPaintFlags(name.getPaintFlags()|Paint.STRIKE_THRU_TEXT_FLAG);
+        info.addView(name);
         String detail = todayDetail(h);
         if (!detail.isEmpty()) info.addView(text(detail,12,done?DONE:MUTED,false));
         c.addView(info,new LinearLayout.LayoutParams(0,-2,1));
-        TextView mark=text(done?"✓":"○",32,done?DONE:ACCENT,true); c.addView(mark,new LinearLayout.LayoutParams(dp(46),dp(46)));
-        if(!done) c.setOnClickListener(v->showCompleteDialog(h,day));
+
+        TextView mark=text(done?"✓":"○",32,done?ACCENT:MUTED,true);
+        mark.setGravity(Gravity.CENTER);
+        c.addView(mark,new LinearLayout.LayoutParams(dp(46),dp(46)));
+        if(!done) c.setOnClickListener(v->showCompleteDialog(h,day,c,mark,name));
         else { c.setAlpha(.58f); c.setOnClickListener(v->toast("Esta tarea ya quedó cumplida")); }
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.bottomMargin=dp(10); c.setLayoutParams(lp); return c;
     }
 
-    private void showCompleteDialog(AppDb.Habit h, LocalDate day) {
+    private void showCompleteDialog(AppDb.Habit h, LocalDate day, View card, TextView mark, TextView name) {
         AlertDialog dialog=styledBuilder()
                 .setTitle("¿Marcar como cumplido?")
                 .setMessage("Después no se puede destildar hasta el próximo día en que corresponda esta tarea.")
@@ -257,12 +283,36 @@ public class MainActivity extends Activity {
                 .setPositiveButton("Sí, cumplido",(d,w)->{
                     db.complete(h.id(),day);
                     boolean dayComplete=db.isDayComplete(day);
-                    renderToday(false,0);
-                    if(dayComplete) handler.postDelayed(this::celebrateDay,140);
+                    animateCheckCompletion(card,mark,name,()->{
+                        renderToday(false,0);
+                        if(dayComplete) handler.postDelayed(this::celebrateDay,120);
+                    });
                 })
                 .create();
         dialog.setOnShowListener(x->styleDialog(dialog));
         dialog.show();
+    }
+
+    private void animateCheckCompletion(View card, TextView mark, TextView name, Runnable finished) {
+        card.setClickable(false);
+        GradientDrawable bubble=new GradientDrawable();
+        bubble.setShape(GradientDrawable.OVAL);
+        bubble.setColor(Color.argb(58,168,255,96));
+        mark.setBackground(bubble);
+        mark.animate().cancel();
+        mark.animate().scaleX(1.55f).scaleY(1.55f).alpha(.12f).setDuration(105).withEndAction(()->{
+            mark.setText("✓");
+            mark.setTextColor(ACCENT);
+            mark.setAlpha(1f);
+            mark.setScaleX(.45f); mark.setScaleY(.45f);
+            name.setTextColor(DONE);
+            name.setPaintFlags(name.getPaintFlags()|Paint.STRIKE_THRU_TEXT_FLAG);
+            mark.animate().scaleX(1.25f).scaleY(1.25f).setDuration(145).withEndAction(()->
+                    mark.animate().scaleX(1f).scaleY(1f).setDuration(105).start()).start();
+            card.animate().alpha(.60f).setDuration(250).start();
+            handler.postDelayed(()->mark.setBackgroundColor(Color.TRANSPARENT),220);
+            handler.postDelayed(finished,330);
+        }).start();
     }
 
     private void celebrateDay() {
@@ -284,72 +334,165 @@ public class MainActivity extends Activity {
     }
 
     private void renderStats(String period,boolean animate,int direction){
-        statsPeriod=period; tab="stats"; setNav(tab); resetContentTransform(); content.removeAllViews();
+        statsPeriod=period; tab="stats"; setNav(tab); resetContentTransform(); content.removeAllViews(); scrollTop();
         TextView kicker=centeredText("CUMPLIMIENTO",13,ACCENT,true); content.addView(kicker,new LinearLayout.LayoutParams(-1,-2));
         TextView title=centeredText("Tu registro",30,TEXT,true); title.setPadding(0,dp(2),0,dp(4)); content.addView(title,new LinearLayout.LayoutParams(-1,-2));
 
-        LinearLayout tabs=row(BG); tabs.addView(periodButton("SEMANA","week",period),new LinearLayout.LayoutParams(0,dp(48),1)); tabs.addView(periodButton("MES","month",period),new LinearLayout.LayoutParams(0,dp(48),1)); tabs.addView(periodButton("AÑO","year",period),new LinearLayout.LayoutParams(0,dp(48),1)); content.addView(tabs);
+        LinearLayout tabs=row(BG);
+        tabs.addView(periodButton("SEMANA","week",period),new LinearLayout.LayoutParams(0,dp(48),1));
+        tabs.addView(periodButton("MES","month",period),new LinearLayout.LayoutParams(0,dp(48),1));
+        tabs.addView(periodButton("AÑO","year",period),new LinearLayout.LayoutParams(0,dp(48),1));
+        content.addView(tabs);
+
         LocalDate to=operationalDay(), from;
-        if(period.equals("week")) from=to.with(DayOfWeek.MONDAY); else if(period.equals("month")) from=YearMonth.from(to).atDay(1); else from=LocalDate.of(to.getYear(),1,1);
-        AppDb.Stats s=db.stats(from,to); int pct=s.possible()==0?0:Math.round(s.done()*100f/s.possible());
+        if(period.equals("week")) from=to.with(DayOfWeek.MONDAY);
+        else if(period.equals("month")) from=YearMonth.from(to).atDay(1);
+        else from=LocalDate.of(to.getYear(),1,1);
+
+        AppDb.Stats s=db.stats(from,to);
+        int pct=s.possible()==0?0:Math.round(s.done()*100f/s.possible());
         space(content,18);
         content.addView(metric("CUMPLIMIENTO",pct+"%",s.done()+" de "+s.possible()+" acciones programadas"));
+
+        space(content,16);
+        ChartData chartData=buildChartData(period,to);
+        content.addView(chartCard(chartData));
+
         space(content,16);
         LinearLayout pair=row(BG); pair.setClipChildren(false); pair.setClipToPadding(false);
         pair.addView(metric("DÍAS PERFECTOS",String.valueOf(s.perfectDays()),"de "+s.trackedDays()+" días con tareas"),new LinearLayout.LayoutParams(0,-2,1));
         space(pair,12);
         pair.addView(metric("RACHA ACTUAL",s.streak()+" días","jornadas programadas completas"),new LinearLayout.LayoutParams(0,-2,1));
         content.addView(pair);
-        space(content,18); content.addView(text("Período: "+from.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))+" — "+to.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),13,MUTED,false));
+        space(content,18);
+        TextView periodText=centeredText("Período: "+from.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))+" — "+to.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),13,MUTED,false);
+        content.addView(periodText,new LinearLayout.LayoutParams(-1,-2));
         if(animate) animateScreenIn(direction);
     }
 
     private Button periodButton(String label,String id,String selected){
-        Button b=button(label,id.equals(selected)?BG:CARD,id.equals(selected)?ACCENT:Color.TRANSPARENT);
-        b.setOnClickListener(v->renderStats(id,false,0));
+        boolean active=id.equals(selected);
+        Button b=button(label,active?BG:MUTED,active?ACCENT:CARD);
+        b.setOnClickListener(v->{
+            if(!id.equals(statsPeriod)) renderStats(id,false,0);
+        });
         return b;
     }
 
     private View metric(String label,String value,String sub){
         LinearLayout c=card(); c.setPadding(dp(16),dp(16),dp(16),dp(16));
         c.addView(text(label,11,ACCENT,true)); c.addView(text(value,30,TEXT,true)); c.addView(text(sub,12,MUTED,false));
+        applyMetricShadow(c);
+        return c;
+    }
+
+    private View chartCard(ChartData data) {
+        LinearLayout c=card();
+        c.setPadding(dp(16),dp(14),dp(12),dp(12));
+        c.addView(text("EVOLUCIÓN",11,ACCENT,true));
+        TextView sub=text(data.subtitle(),12,MUTED,false); sub.setPadding(0,dp(2),0,dp(4)); c.addView(sub);
+        LineChartView chart=new LineChartView(this);
+        c.addView(chart,new LinearLayout.LayoutParams(-1,dp(205)));
+        applyMetricShadow(c);
+        chart.post(()->chart.setData(data.values(),data.labels()));
+        return c;
+    }
+
+    private void applyMetricShadow(View c) {
         c.setElevation(dp(10));
         if(Build.VERSION.SDK_INT>=28) {
             c.setOutlineAmbientShadowColor(Color.rgb(224,205,245));
             c.setOutlineSpotShadowColor(Color.rgb(150,105,205));
         }
-        return c;
+    }
+
+    private ChartData buildChartData(String period, LocalDate to) {
+        if("year".equals(period)) {
+            int count=to.getMonthValue();
+            float[] values=new float[count];
+            String[] labels=new String[count];
+            String[] months={"Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"};
+            for(int m=1;m<=count;m++) {
+                YearMonth ym=YearMonth.of(to.getYear(),m);
+                LocalDate start=ym.atDay(1);
+                LocalDate end=ym.atEndOfMonth();
+                if(end.isAfter(to)) end=to;
+                values[m-1]=percentFor(start,end);
+                labels[m-1]=months[m-1];
+            }
+            return new ChartData(values,labels,"Por mes · "+to.getYear());
+        }
+
+        LocalDate from="week".equals(period) ? to.with(DayOfWeek.MONDAY) : YearMonth.from(to).atDay(1);
+        int count=(int)(to.toEpochDay()-from.toEpochDay())+1;
+        float[] values=new float[count];
+        String[] labels=new String[count];
+        String[] week={"Lun","Mar","Mié","Jue","Vie","Sáb","Dom"};
+        for(int i=0;i<count;i++) {
+            LocalDate d=from.plusDays(i);
+            values[i]=percentFor(d,d);
+            labels[i]="week".equals(period) ? week[d.getDayOfWeek().getValue()-1] : String.valueOf(d.getDayOfMonth());
+        }
+        return new ChartData(values,labels,"week".equals(period)?"Por día · esta semana":"Por día · este mes");
+    }
+
+    private float percentFor(LocalDate from, LocalDate to) {
+        AppDb.Stats s=db.stats(from,to);
+        return s.possible()==0 ? -1f : (s.done()*100f/s.possible());
     }
 
     private void renderConfig(long animatedHabitId,int moveDelta,boolean animate,int direction){
-        tab="config"; setNav(tab); resetContentTransform(); content.removeAllViews(); content.addView(text("CONFIGURACIÓN",13,ACCENT,true)); content.addView(text("Tus hábitos",30,TEXT,true));
-        Button add=button("＋ AGREGAR HÁBITO",BG,ACCENT); add.setOnClickListener(v->editDialog(null)); content.addView(add,new LinearLayout.LayoutParams(-1,dp(52))); space(content,14);
+        tab="config"; setNav(tab); resetContentTransform(); content.removeAllViews(); scrollTop();
+        TextView kicker=centeredText("CONFIGURACIÓN",13,ACCENT,true); content.addView(kicker,new LinearLayout.LayoutParams(-1,-2));
+        TextView title=centeredText("Tus tareas",30,TEXT,true); title.setPadding(0,dp(2),0,dp(8)); content.addView(title,new LinearLayout.LayoutParams(-1,-2));
+        Button add=button("＋ AGREGAR TAREA",BG,ACCENT); add.setOnClickListener(v->editDialog(null)); content.addView(add,new LinearLayout.LayoutParams(-1,dp(52))); space(content,14);
         for(AppDb.Habit h:db.habits(false)) {
             View c=configCard(h);
             content.addView(c);
             if(h.id()==animatedHabitId) animateSettledCard(c,h.active()?1f:.5f,moveDelta);
         }
-        TextView note=text("Podés hacer una tarea diaria o elegir varios días de la semana y agregarle un aviso con hora y tono. Los hábitos retirados conservan su historial.",12,MUTED,false); note.setPadding(0,dp(14),0,0); content.addView(note);
+        TextView note=text("Podés hacer una tarea diaria o elegir varios días de la semana, agregarle un aviso o anularla sin perder su historial. El tachito la elimina definitivamente.",12,MUTED,false); note.setPadding(0,dp(14),0,0); content.addView(note);
         if(animate) animateScreenIn(direction);
     }
 
     private View configCard(AppDb.Habit h){
-        LinearLayout c=card(); c.setOrientation(LinearLayout.HORIZONTAL); c.setGravity(Gravity.CENTER_VERTICAL); c.setPadding(dp(14),dp(10),dp(8),dp(10)); c.setAlpha(h.active()?1f:.5f);
+        LinearLayout c=card(); c.setOrientation(LinearLayout.HORIZONTAL); c.setGravity(Gravity.CENTER_VERTICAL); c.setPadding(dp(12),dp(10),dp(6),dp(10)); c.setAlpha(h.active()?1f:.5f);
         LinearLayout info=column(Color.TRANSPARENT);
         info.addView(text(h.name(),16,TEXT,true));
         info.addView(text(configDetail(h),11,MUTED,false));
         c.addView(info,new LinearLayout.LayoutParams(0,-2,1));
-        Button up=button("↑",TEXT,Color.TRANSPARENT); up.setOnClickListener(v->animateMove(h,-1,c)); c.addView(up,new LinearLayout.LayoutParams(dp(44),dp(44)));
-        Button down=button("↓",TEXT,Color.TRANSPARENT); down.setOnClickListener(v->animateMove(h,1,c)); c.addView(down,new LinearLayout.LayoutParams(dp(44),dp(44)));
-        Button edit=button("✎",ACCENT,Color.TRANSPARENT); edit.setOnClickListener(v->editDialog(h)); c.addView(edit,new LinearLayout.LayoutParams(dp(44),dp(44)));
-        Button active=button(h.active()?"×":"＋",h.active()?Color.rgb(255,120,120):ACCENT,Color.TRANSPARENT);
+
+        Button up=button("↑",TEXT,Color.TRANSPARENT); up.setTextSize(14); up.setOnClickListener(v->animateMove(h,-1,c)); c.addView(up,new LinearLayout.LayoutParams(dp(38),dp(44)));
+        Button down=button("↓",TEXT,Color.TRANSPARENT); down.setTextSize(14); down.setOnClickListener(v->animateMove(h,1,c)); c.addView(down,new LinearLayout.LayoutParams(dp(38),dp(44)));
+        Button edit=button("✎",ACCENT,Color.TRANSPARENT); edit.setTextSize(14); edit.setOnClickListener(v->editDialog(h)); c.addView(edit,new LinearLayout.LayoutParams(dp(38),dp(44)));
+        Button active=button(h.active()?"×":"＋",h.active()?Color.rgb(255,120,120):ACCENT,Color.TRANSPARENT); active.setTextSize(15);
         active.setOnClickListener(v->{
             boolean next=!h.active(); db.setActive(h.id(),next); AppDb.Habit updated=db.habit(h.id());
             if(updated!=null && updated.active() && updated.notifyEnabled()) AlarmScheduler.scheduleHabit(this,updated); else AlarmScheduler.cancelHabit(this,h.id());
             renderConfig(-1,0,false,0);
         });
-        c.addView(active,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        c.addView(active,new LinearLayout.LayoutParams(dp(38),dp(44)));
+        Button delete=button("🗑",Color.rgb(255,145,155),Color.TRANSPARENT); delete.setTextSize(15); delete.setOnClickListener(v->confirmDelete(h)); c.addView(delete,new LinearLayout.LayoutParams(dp(40),dp(44)));
+
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.bottomMargin=dp(9); c.setLayoutParams(lp); return c;
+    }
+
+    private void confirmDelete(AppDb.Habit h) {
+        AlertDialog dialog=styledBuilder()
+                .setTitle("Eliminar tarea")
+                .setMessage("¿Querés eliminar \""+h.name()+"\"? También se borrará todo su historial de cumplimiento. Esta acción no se puede deshacer.")
+                .setNegativeButton("Cancelar",null)
+                .setPositiveButton("Eliminar",(d,w)->{
+                    AlarmScheduler.cancelHabit(this,h.id());
+                    db.deleteHabit(h.id());
+                    renderConfig(-1,0,false,0);
+                })
+                .create();
+        dialog.setOnShowListener(x->{
+            styleDialog(dialog);
+            if(dialog.getButton(AlertDialog.BUTTON_POSITIVE)!=null) dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.rgb(255,145,155));
+        });
+        dialog.show();
     }
 
     private void animateMove(AppDb.Habit h,int delta,View card) {
@@ -428,7 +571,7 @@ public class MainActivity extends Activity {
         notify.setOnCheckedChangeListener((b,checked)->{time.setVisibility(checked?View.VISIBLE:View.GONE);tone.setVisibility(checked?View.VISIBLE:View.GONE);});
 
         AlertDialog dialog=styledBuilder()
-                .setTitle(isNew?"Nuevo hábito":"Editar hábito")
+                .setTitle(isNew?"Nueva tarea":"Editar tarea")
                 .setView(scroll)
                 .setNegativeButton("Cancelar",null)
                 .setPositiveButton("Guardar",null)
