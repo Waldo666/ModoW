@@ -5,12 +5,18 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
+        android:name=".WModeApp"
         android:allowBackup="true"
         android:fullBackupContent="true"
         android:icon="@drawable/app_icon_leoric"
         android:label="W-mode"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".BackupActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity
             android:name=".MainActivity"
