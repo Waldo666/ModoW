@@ -4,7 +4,6 @@ name: Build W-mode Release
   push:
     branches:
       - main
-      - agent/v1.5.1-stable-backup
   workflow_dispatch:
 
 permissions:
