@@ -10,13 +10,28 @@ android {
         applicationId 'com.waldo.modow'
         minSdk 24
         targetSdk 35
-        versionCode 7
-        versionName '1.5.0'
+        versionCode 8
+        versionName '1.5.1'
+    }
+
+    signingConfigs {
+        release {
+            def ksPath = System.getenv('MODOW_KEYSTORE_PATH')
+            if (ksPath != null && !ksPath.isBlank()) {
+                storeFile file(ksPath)
+                storePassword System.getenv('MODOW_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('MODOW_KEY_ALIAS')
+                keyPassword System.getenv('MODOW_KEY_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            if (System.getenv('MODOW_KEYSTORE_PATH') != null && !System.getenv('MODOW_KEYSTORE_PATH').isBlank()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
